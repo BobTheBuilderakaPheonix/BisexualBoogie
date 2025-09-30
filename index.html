@@ -35,12 +35,12 @@
   <h2>Agent Unlock System</h2>
   <form id="unlockForm">
     <label>
-      Agent Name:
+      Enter your Agent Code (you were assigned a unique Letter, go check the table):
       <input type="text" id="agentName" required autocomplete="off" maxlength="2" size="2">
     </label>
     <label>
-      Key:
-      <input type="text" id="agentKey" required autocomplete="off" maxlength="4">
+      Enter your 4 Digit Key (E.g.) MF00:
+      <input type="text" id="agentKey" required autocomplete="off" maxlength="4"size="5">
     </label>
     <button type="submit">Unlock</button>
   </form>
@@ -100,7 +100,11 @@
             </tbody>
           </table>
           <div id="eventbriteLink">
-            <p>To get your tickets for <strong>BCB 2025 Games Evening</strong>, please click the button below:</p>
+            <p>Welcome ${agent["Agent Name"]} </p>
+            <br>
+            <p><strong> Follow these instructions to collect your Ticket </strong></p>
+            <p> 1. Make a note of the password you will need to access the ticket booth.
+            <p> 2. To get your tickets for <strong>BCB 2025 Games Evening</strong>, please click the button below:</p>
             <a id="eventbriteBtn" href="${eventbriteURL}" target="_blank" rel="noopener">Get Your Tickets</a>
           </div>
         `;
