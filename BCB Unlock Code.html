@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agent Unlock</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    label { display:block; margin-top:1em;}
+    input[type="text"] { text-transform:uppercase; }
+    #agentName { width: 2em; padding: 2px 4px; font-size: 1em; text-align: center; }
+    #resultTable { margin-top: 1em; border-collapse: collapse; min-width: 300px; }
+    #resultTable th, #resultTable td { border: 1px solid #888; padding: 0.5em 1em; text-align: left; }
+    #resultTable th { background: #eee; }
+    #errorMsg { color: red; margin-top: 1em; font-size: 1.1em; }
+    #eventbriteLink { margin-top: 2em; font-size: 1.15em; color: #2163b0; font-weight: bold; text-align: left; }
+    #eventbriteBtn {
+      display: inline-block;
+      margin-top: 0.5em;
+      padding: 0.6em 1.5em;
+      background: #ff6f00;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1em;
+      font-weight: bold;
+      text-decoration: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #eventbriteBtn:hover { background: #e65c00; }
+  </style>
+</head>
+<body>
+  <h2>Agent Unlock System</h2>
+  <form id="unlockForm">
+    <label>
+      Agent Name:
+      <input type="text" id="agentName" required autocomplete="off" maxlength="2" size="2">
+    </label>
+    <label>
+      Key:
+      <input type="text" id="agentKey" required autocomplete="off" maxlength="4">
+    </label>
+    <button type="submit">Unlock</button>
+  </form>
+  <div id="output"></div>
+
+  <script>
+    const csvData = [
+      { "Agent Name": "A", "KEY": "LI93", "Score": "0.75", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "D", "KEY": "AH02", "Score": "0.8", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "E", "KEY": "TC90", "Score": "0.65", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "F", "KEY": "WB78", "Score": "0.65", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "G", "KEY": "OI95", "Score": "0.8", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "H", "KEY": "AN01", "Score": "0.8", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "J", "KEY": "EI89", "Score": "0.75", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "M", "KEY": "KH82", "Score": "0.9", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "N", "KEY": "ND85", "Score": "0.8", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "R", "KEY": "GP93", "Score": "0.5", "Password": "N!ght$OfG@me$" },
+      { "Agent Name": "S", "KEY": "JE99", "Score": "0.5", "Password": "N!ght$OfG@me$" }
+    ];
+
+    const eventbriteURL = "https://www.eventbrite.com/e/bcb-2025-games-evening-tickets-1689851935629?aff=oddtdtcreator";
+
+    document.getElementById('unlockForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const agentName = document.getElementById('agentName').value.trim();
+      const agentKey = document.getElementById('agentKey').value.trim();
+      const outputDiv = document.getElementById('output');
+      outputDiv.innerHTML = "";
+
+      if (!/^[A-Z]+$/.test(agentName) || !/^[A-Z0-9]+$/.test(agentKey)) {
+        outputDiv.innerHTML = '<div id="errorMsg">Please enter Agent Name and Key in ALL CAPS (no lowercase letters).</div>';
+        return;
+      }
+
+      const agent = csvData.find(row =>
+        row["Agent Name"] === agentName && row["KEY"] === agentKey
+      );
+
+      if(agent) {
+        outputDiv.innerHTML = `
+          <table id="resultTable">
+            <thead>
+              <tr>
+                <th>Agent Name</th>
+                <th>Key</th>
+                <th>Score</th>
+                <th>Password</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${agent["Agent Name"]}</td>
+                <td>${agent["KEY"]}</td>
+                <td>${agent["Score"]}</td>
+                <td>${agent["Password"]}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div id="eventbriteLink">
+            <p>To get your tickets for <strong>BCB 2025 Games Evening</strong>, please click the button below:</p>
+            <a id="eventbriteBtn" href="${eventbriteURL}" target="_blank" rel="noopener">Get Your Tickets</a>
+          </div>
+        `;
+      } else {
+        outputDiv.innerHTML = '<div id="errorMsg">Invalid Agent Name or Key.</div>';
+      }
+    });
+
+    document.getElementById('agentName').addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+    });
+    document.getElementById('agentKey').addEventListener('input', function() {
+      this.value = this.value.toUpperCase();
+    });
+  </script>
+</body>
+</html>
