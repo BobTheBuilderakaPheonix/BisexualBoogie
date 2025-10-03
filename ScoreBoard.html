@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Game Scoreboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase Log Level to Debug for console visibility
+        setLogLevel('Debug');
+
+        /* * Configuration for External Hosting (GitHub Pages, etc.). 
+         * These keys are placeholders and MUST be replaced with your actual
+         * Firebase project configuration for external use. 
+         * In the Canvas environment, these empty values are ignored, and
+         * the environment's credentials are used instead.
+         */
+        const EXTERNAL_HOSTING_CONFIG = {
+            apiKey: "", 
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+        
+        // Static ID used for external hosting's collection path
+        const HOSTING_APP_ID = "game-event-scoreboard"; 
+
+        // --- Environment Detection & Configuration Setup ---
+        
+        const isCanvasEnvironment = typeof __firebase_config !== 'undefined';
+        
+        const firebaseConfig = isCanvasEnvironment 
+            ? JSON.parse(__firebase_config) 
+            : EXTERNAL_HOSTING_CONFIG;
+        
+        const initialAuthToken = isCanvasEnvironment && typeof __initial_auth_token !== 'undefined'
+            ? __initial_auth_token
+            : null;
+            
+        const currentAppId = isCanvasEnvironment && typeof __app_id !== 'undefined'
+            ? __app_id
+            : HOSTING_APP_ID;
+
+        let db;
+        let auth;
+        let userId = 'loading'; // Will be updated after auth
+
+        // --- Utility Functions ---
+
+        // Converts raw snapshot data into a sorted array of score objects
+        const formatAndSortScores = (snapshot) => {
+            const scores = [];
+            snapshot.forEach(doc => {
+                scores.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            // Sort by score (descending)
+            scores.sort((a, b) => b.score - a.score);
+            return scores;
+        };
+
+        // --- Core Application Logic ---
+
+        const initializeFirebase = async () => {
+            try {
+                // Initialize using the derived config object
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Authenticate: Use custom token if available (Canvas), otherwise sign in anonymously
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                document.getElementById('userIdDisplay').textContent = `User ID: ${userId}`;
+                
+                startScoreListener(db);
+
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                document.getElementById('errorMessage').textContent = 'Error connecting to the scoreboard database. Check console for details.';
+            }
+        };
+
+        // Path to the public collection for collaborative data, using the determined App ID
+        const getScoresCollection = (db) => {
+            return collection(db, `artifacts/${currentAppId}/public/data/scores`);
+        };
+
+        const startScoreListener = (db) => {
+            const scoresRef = getScoresCollection(db);
+            const q = query(scoresRef);
+
+            onSnapshot(q, (snapshot) => {
+                const sortedScores = formatAndSortScores(snapshot);
+                renderScoreboard(sortedScores);
+            }, (error) => {
+                console.error("Firestore Listener Error:", error);
+                document.getElementById('errorMessage').textContent = 'Real-time score updates failed.';
+            });
+        };
+
+        const addTeam = async (teamName) => {
+            if (!db || teamName.trim() === '') return;
+
+            try {
+                await addDoc(getScoresCollection(db), {
+                    name: teamName.trim(),
+                    score: 0,
+                    userId: userId,
+                    timestamp: Date.now()
+                });
+                document.getElementById('teamNameInput').value = ''; // Clear input
+            } catch (e) {
+                console.error("Error adding document: ", e);
+            }
+        };
+
+        const updateScore = async (id, currentScore, delta) => {
+            if (!db) return;
+            const newScore = Math.max(0, currentScore + delta); // Prevent negative scores
+
+            try {
+                const scoreDocRef = doc(getScoresCollection(db), id);
+                await setDoc(scoreDocRef, { score: newScore }, { merge: true });
+            } catch (e) {
+                console.error("Error updating score: ", e);
+            }
+        };
+
+        const deleteTeam = async (id) => {
+            if (!db) return;
+
+            // Use a custom confirmation modal instead of alert/confirm
+            showModal('Are you sure?', `Do you want to permanently remove this team?`, async () => {
+                try {
+                    const scoreDocRef = doc(getScoresCollection(db), id);
+                    await deleteDoc(scoreDocRef);
+                } catch (e) {
+                    console.error("Error deleting team: ", e);
+                }
+            });
+        };
+
+        // --- UI Rendering ---
+
+        const scoreboardBody = document.getElementById('scoreboardBody');
+        const errorMessage = document.getElementById('errorMessage');
+
+        const renderScoreboard = (scores) => {
+            scoreboardBody.innerHTML = ''; // Clear previous
+            errorMessage.textContent = ''; // Clear error message
+
+            if (scores.length === 0) {
+                scoreboardBody.innerHTML = `
+                    <tr><td colspan="4" class="py-4 text-center text-gray-500">No teams yet. Add the first team to begin the games!</td></tr>
+                `;
+                return;
+            }
+
+            scores.forEach((team, index) => {
+                const rank = index + 1;
+                let rankStyle = 'bg-gray-700 text-white';
+                if (rank === 1) rankStyle = 'bg-yellow-500 text-gray-900 font-extrabold';
+                else if (rank === 2) rankStyle = 'bg-gray-400 text-gray-900 font-bold';
+                else if (rank === 3) rankStyle = 'bg-amber-600 text-gray-900 font-semibold';
+
+                const row = document.createElement('tr');
+                row.classList.add('border-b', 'border-gray-700', 'hover:bg-gray-800', 'transition-colors');
+                row.innerHTML = `
+                    <td class="p-4 rounded-l-lg">
+                        <span class="px-3 py-1 rounded-full text-lg ${rankStyle}">#${rank}</span>
+                    </td>
+                    <td class="p-4 text-xl font-bold text-left">${team.name}</td>
+                    <td class="p-4 text-3xl font-mono text-center">${team.score}</td>
+                    <td class="p-4 rounded-r-lg">
+                        <div class="flex space-x-2 justify-center">
+                            <button class="score-btn bg-green-600 hover:bg-green-700 p-2 rounded-lg text-lg font-bold w-10 h-10 shadow-md" data-id="${team.id}" data-score="${team.score}" data-delta="1">+</button>
+                            <button class="score-btn bg-red-600 hover:bg-red-700 p-2 rounded-lg text-lg font-bold w-10 h-10 shadow-md" data-id="${team.id}" data-score="${team.score}" data-delta="-1">-</button>
+                            <button class="delete-btn bg-transparent hover:text-red-500 text-gray-400 p-2 rounded-full transition-colors" data-id="${team.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                scoreboardBody.appendChild(row);
+            });
+
+            // Attach event listeners to the new buttons
+            document.querySelectorAll('.score-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    // Use currentTarget to ensure we get the button element
+                    const target = e.currentTarget; 
+                    const id = target.dataset.id;
+                    const score = parseInt(target.dataset.score);
+                    const delta = parseInt(target.dataset.delta);
+                    updateScore(id, score, delta);
+                };
+            });
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    deleteTeam(id);
+                };
+            });
+        };
+
+        // --- Confirmation Modal Logic (Replaces alert/confirm) ---
+        
+        const modal = document.createElement('div');
+        modal.id = 'customModal';
+        modal.className = 'hidden fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center';
+        modal.innerHTML = `
+            <div class="bg-gray-900 p-6 rounded-xl shadow-2xl max-w-sm w-full border border-gray-700">
+                <h3 id="modalTitle" class="text-xl font-bold mb-4 text-white"></h3>
+                <p id="modalMessage" class="mb-6 text-gray-300"></p>
+                <div class="flex justify-end space-x-4">
+                    <button id="modalCancel" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel</button>
+                    <button id="modalConfirm" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Confirm</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        let confirmCallback = () => {};
+
+        const showModal = (title, message, callback) => {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            modal.classList.remove('hidden');
+            confirmCallback = callback;
+        };
+
+        const hideModal = () => {
+            modal.classList.add('hidden');
+        };
+
+        document.getElementById('modalCancel').onclick = hideModal;
+        document.getElementById('modalConfirm').onclick = () => {
+            confirmCallback();
+            hideModal();
+        };
+
+
+        // --- Event Listeners and Initialization ---
+
+        window.onload = initializeFirebase;
+
+        document.getElementById('addTeamForm').onsubmit = (e) => {
+            e.preventDefault();
+            const input = document.getElementById('teamNameInput');
+            addTeam(input.value);
+        };
+
+    </script>
+    <style>
+        .scoreboard-bg {
+            background-color: #111827; /* Darker than body for contrast */
+        }
+        .scoreboard-table th, .scoreboard-table td {
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 bg-black text-white min-h-screen font-sans">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10 p-6 bg-gray-900 rounded-xl shadow-lg border-b-4 border-purple-600">
+            <h1 class="text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+                Event Scoreboard
+            </h1>
+            <p class="text-gray-400 mt-2 text-lg">Real-time ranking for the games</p>
+            <p id="userIdDisplay" class="text-xs mt-2 text-gray-500"></p>
+        </header>
+
+        <!-- Error Message Display -->
+        <p id="errorMessage" class="text-red-500 text-center mb-4 font-bold"></p>
+        
+        <!-- Add Team Form -->
+        <div class="mb-8 p-4 bg-gray-800 rounded-lg shadow-inner">
+            <form id="addTeamForm" class="flex flex-col sm:flex-row gap-3">
+                <input type="text" id="teamNameInput" placeholder="Enter Team or Player Name" required
+                       class="flex-grow p-3 rounded-lg bg-gray-700 text-white border-none focus:ring-2 focus:ring-purple-500 placeholder-gray-400">
+                <button type="submit" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200">
+                    Add Team
+                </button>
+            </form>
+        </div>
+
+        <!-- Scoreboard Table -->
+        <div class="overflow-x-auto scoreboard-bg p-4 rounded-xl shadow-2xl">
+            <table class="min-w-full divide-y divide-gray-700 scoreboard-table">
+                <thead>
+                    <tr class="text-gray-400 uppercase text-sm">
+                        <th scope="col" class="px-4 py-3 text-center">Rank</th>
+                        <th scope="col" class="px-4 py-3 text-left">Team/Player</th>
+                        <th scope="col" class="px-4 py-3 text-center">Score</th>
+                        <th scope="col" class="px-4 py-3 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="scoreboardBody" class="divide-y divide-gray-800">
+                    <!-- Score rows will be injected here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>
