@@ -20,13 +20,34 @@
          * In the Canvas environment, these empty values are ignored, and
          * the environment's credentials are used instead.
          */
-        const EXTERNAL_HOSTING_CONFIG = {
-            apiKey: "", 
-            authDomain: "",
-            projectId: "",
-            storageBucket: "",
-            messagingSenderId: "",
-            appId: ""
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDmLmVQsi6uraaXYENaljFvWBQbb-fJUQ0",
+  authDomain: "bisexual-boogie.firebaseapp.com",
+  projectId: "bisexual-boogie",
+  storageBucket: "bisexual-boogie.firebasestorage.app",
+  messagingSenderId: "287176135119",
+  appId: "1:287176135119:web:439d1d8688384dcc7f42ba",
+  measurementId: "G-MQQEJ4DYLM"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);const EXTERNAL_HOSTING_CONFIG = {
+            apiKey: "AIzaSyDmLmVQsi6uraaXYENaljFvWBQbb-fJUQ0",
+            authDomain: "bisexual-boogie.firebaseapp.com",
+            projectId: "bisexual-boogie",
+            storageBucket: "bisexual-boogie.firebasestorage.app",
+            messagingSenderId: "287176135119",
+            appId: "1:287176135119:web:439d1d8688384dcc7f42ba",
+            measurementId: "G-MQQEJ4DYLM"
         };
         
         // Static ID used for external hosting's collection path
